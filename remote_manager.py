@@ -1,5 +1,4 @@
 import logging
-import re
 from typing import Any, Callable, Union
 
 import paramiko
@@ -102,24 +101,13 @@ while True:
             logger.info("Available commands: \n"
                         "{replace} --> perform replacement modified files to remote repository \n"
                         "{undo}    --> undo replacement changes \n"
-                        "{config}  --> config, parameters: \n"
-                        "              --hostname\n"
-                        "              --username\n"
-                        "              --key_filepath\n"
-                        "              --local_repository_path\n"
-                        "              --remote_repository_path\n"
-                        "              --app_restart_command\n"
-                        "              --celery_restart_command\n"
-                        "              --is_restart_app\n"
-                        "              show option value: {config --hostname}\n"
+                        "{config}  --> config: \n"
                         "              set full new config: {config --set}\n"
                         "              see config options: {config}")
 
         elif command.startswith("config"):
             config = {}
             if options:
-                if len(options) > 1:
-                    setattr(manager, options[0], options[1])
                 if options[0] == 'set':
                     config["hostname"] = input("hostname: ")
                     config["username"] = input("username: ")
@@ -131,8 +119,6 @@ while True:
                     config["is_restart_app"] = input("is_restart_app: ")
                     manager.set_config(config)
                     continue
-                if len(options) == 1:
-                    logger.info(f"{options[0]} = {manager.__getattribute__(options[0])}")
             else:
                 for attribute, value in manager.__dict__.items():
                     logger.info(f"{attribute + ' = ' + str(value)}")
