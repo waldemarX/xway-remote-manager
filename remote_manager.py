@@ -99,8 +99,8 @@ while True:
 
         if command.startswith("help"):
             logger.info("Available commands: \n"
-                        "{replace} --> perform replacement modified files to remote repository \n"
-                        "{undo}    --> undo replacement changes \n"
+                        "{r} | {replace} --> perform replacement modified files to remote repository \n"
+                        "{u} | {undo}    --> undo replacement changes \n"
                         "{config}  --> config: \n"
                         "              set full new config: {config --set}\n"
                         "              see config options: {config}")
