@@ -1,4 +1,5 @@
 import logging
+import re
 from typing import Any, Callable, Union
 
 import paramiko
@@ -67,7 +68,7 @@ class RemoteManager:
     def perform_replacement(self, ssh: paramiko.SSHClient):
         local_project_repo = Repo(self.local_repository_path)
         changed_files = [item.a_path for item in local_project_repo.index.diff(None)]
-        logger.info(f"Changed files --> {changed_files}")
+        logger.info(f"Changed files ({len(changed_files)}) --> {changed_files}")
         sftp = ssh.open_sftp()
         for local_file_path in changed_files:
             full_local_file_path = self.local_repository_path + local_file_path
@@ -96,13 +97,12 @@ while True:
         if '--' in command:
             _c = command.split('--')
             options = _c[-1].split(' ')
-            command = _c[0]
 
         if command.startswith("help"):
             logger.info("Available commands: \n"
                         "{replace} --> perform replacement modified files to remote repository \n"
                         "{undo}    --> undo replacement changes \n"
-                        "{config}  --> set-up new config, options: \n"
+                        "{config}  --> config, parameters: \n"
                         "              --hostname\n"
                         "              --username\n"
                         "              --key_filepath\n"
@@ -111,30 +111,31 @@ while True:
                         "              --app_restart_command\n"
                         "              --celery_restart_command\n"
                         "              --is_restart_app\n"
-                        "              set option: {config --hostname 0.0.0.0}\n"
                         "              show option value: {config --hostname}\n"
-                        "              to set full new config write {config}")
+                        "              set full new config: {config --set}\n"
+                        "              see config options: {config}")
 
         elif command.startswith("config"):
             config = {}
             if options:
                 if len(options) > 1:
                     setattr(manager, options[0], options[1])
-                # elif options[0] == 'all':
-                #     for attr in ...:
-                #         ...
-                else:
+                if options[0] == 'set':
+                    config["hostname"] = input("hostname: ")
+                    config["username"] = input("username: ")
+                    config["key_filepath"] = input("key_filepath: ")
+                    config["local_repository_path"] = input("local_repository_path: ")
+                    config["remote_repository_path"] = input("remote_repository_path: ")
+                    config["app_restart_command"] = input("app_restart_command: ")
+                    config["celery_restart_command"] = input("celery_restart_command: ")
+                    config["is_restart_app"] = input("is_restart_app: ")
+                    manager.set_config(config)
+                    continue
+                if len(options) == 1:
                     logger.info(f"{options[0]} = {manager.__getattribute__(options[0])}")
             else:
-                config["hostname"] = input("hostname: ")
-                config["username"] = input("username: ")
-                config["key_filepath"] = input("key_filepath: ")
-                config["local_repository_path"] = input("local_repository_path: ")
-                config["remote_repository_path"] = input("remote_repository_path: ")
-                config["app_restart_command"] = input("app_restart_command: ")
-                config["celery_restart_command"] = input("celery_restart_command: ")
-                config["is_restart_app"] = input("is_restart_app: ")
-                manager.set_config(config)
+                for attribute, value in manager.__dict__.items():
+                    logger.info(f"{attribute + ' = ' + str(value)}")
 
         elif command.startswith("replace") or command == "r":
             manager.perform_replacement()
