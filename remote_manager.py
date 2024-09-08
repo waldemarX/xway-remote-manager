@@ -50,25 +50,25 @@ class RemoteManager:
                 config[name] = value.strip()
         self.__init__(**config)
 
-    def _ssh_connection(use_restart_option: bool = False):
-        def decorator(func):
-            def wrapper(self, *args, **kwargs):
-                try:
-                    ssh = paramiko.SSHClient()
-                    ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-                    ssh.connect(hostname=self.hostname, username=self.username, key_filename=self.key_filepath)
-                    kwargs.update({"ssh": ssh})
-                    func(self, *args, **kwargs)
-                    if use_restart_option and self.is_restart_app:
-                        logger.info("Restarting server...")
-                        ssh.exec_command(self.restart_command)
-                    ssh.close()
-                except Exception as error:
-                    logger.error(str(error))
-            return wrapper
-        return decorator
+    def _app_restart(self, ssh: paramiko.SSHClient):
+        if self.is_restart_app:
+            logger.info("Restarting server...")
+            ssh.exec_command(self.restart_command)
 
-    @_ssh_connection(use_restart_option=True)
+    def _ssh_connection(func: Callable):
+        def wrapper(self, *args, **kwargs) -> None:
+            try:
+                ssh = paramiko.SSHClient()
+                ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+                ssh.connect(hostname=self.hostname, username=self.username, key_filename=self.key_filepath)
+                kwargs.update({"ssh": ssh})
+                func(self, *args, **kwargs)
+                ssh.close()
+            except Exception as error:
+                logger.error(str(error))
+        return wrapper
+
+    @_ssh_connection
     def perform_replacement(self, ssh: paramiko.SSHClient):
         local_project_repo = Repo(self.local_repository_path)
         changed_files = [item.a_path for item in local_project_repo.index.diff(None)]
@@ -80,20 +80,22 @@ class RemoteManager:
             sftp.put(full_local_file_path, full_remote_file_path)
         logging.info(f"Files replaced successfully!")
         sftp.close()
+        self._app_restart(ssh)
 
-    @_ssh_connection(use_restart_option=False)
+    @_ssh_connection
     def undo_replacement(self, ssh: paramiko.SSHClient):
         stdin, stdout, stderr = ssh.exec_command(f"cd {self.remote_repository_path}; git stash -u && git stash drop")
         logging.info(f"SERVER RESPONSE:\n{''.join(stdout.readlines())}")
         logging.info(f"Сhanges were successfully rolled back!")
 
-    @_ssh_connection(use_restart_option=True)
+    @_ssh_connection
     def re_switch_branch(self, branch: str, ssh: paramiko.SSHClient):
         stdin, stdout, stderr = ssh.exec_command(f"cd {self.remote_repository_path}; git switch master; "
                                                  f"git branch -D {branch}; "
                                                  f"git switch -c {branch} --track origin/{branch}")
         logging.info(f"SERVER RESPONSE:\n{''.join(stdout.readlines())}")
         logging.info(f"Branch successfully re-switched")
+        self._app_restart(ssh)
 
 
 manager = RemoteManager()
