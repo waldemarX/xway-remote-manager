@@ -28,8 +28,7 @@ class RemoteManager:
         self.key_filepath = key_filepath
         self.local_repository_path = local_repository_path
         self.remote_repository_path = remote_repository_path
-        self.app_restart_command = app_restart_command
-        self.celery_restart_command = celery_restart_command
+        self.restart_command = f"{app_restart_command}; {celery_restart_command}"
         self.is_restart_app = eval(is_restart_app) if isinstance(is_restart_app, str) \
                                                    else is_restart_app
 
@@ -51,19 +50,25 @@ class RemoteManager:
                 config[name] = value.strip()
         self.__init__(**config)
 
-    def _ssh_connection(func: Callable):
-        def wrapper(self, *args, **kwargs) -> None:
-            try:
-                ssh = paramiko.SSHClient()
-                ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-                ssh.connect(hostname=self.hostname, username=self.username, key_filename=self.key_filepath)
-                func(self, ssh, *args, **kwargs)
-                ssh.close()
-            except Exception as error:
-                logger.error(str(error))
-        return wrapper
+    def _ssh_connection(use_restart_option: bool = False):
+        def decorator(func):
+            def wrapper(self, *args, **kwargs):
+                try:
+                    ssh = paramiko.SSHClient()
+                    ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+                    ssh.connect(hostname=self.hostname, username=self.username, key_filename=self.key_filepath)
+                    kwargs.update({"ssh": ssh})
+                    func(self, *args, **kwargs)
+                    if use_restart_option and self.is_restart_app:
+                        logger.info("Restarting server...")
+                        ssh.exec_command(self.restart_command)
+                    ssh.close()
+                except Exception as error:
+                    logger.error(str(error))
+            return wrapper
+        return decorator
 
-    @_ssh_connection
+    @_ssh_connection(use_restart_option=True)
     def perform_replacement(self, ssh: paramiko.SSHClient):
         local_project_repo = Repo(self.local_repository_path)
         changed_files = [item.a_path for item in local_project_repo.index.diff(None)]
@@ -74,16 +79,21 @@ class RemoteManager:
             full_remote_file_path = self.remote_repository_path + local_file_path
             sftp.put(full_local_file_path, full_remote_file_path)
         logging.info(f"Files replaced successfully!")
-        if self.is_restart_app:
-            logger.info("Restarting server...")
-            ssh.exec_command(f"{self.app_restart_command}; {self.celery_restart_command}")
         sftp.close()
 
-    @_ssh_connection
+    @_ssh_connection(use_restart_option=False)
     def undo_replacement(self, ssh: paramiko.SSHClient):
         stdin, stdout, stderr = ssh.exec_command(f"cd {self.remote_repository_path}; git stash -u && git stash drop")
-        logging.info(stdout.readlines())
+        logging.info(f"SERVER RESPONSE:\n{''.join(stdout.readlines())}")
         logging.info(f"Сhanges were successfully rolled back!")
+
+    @_ssh_connection(use_restart_option=True)
+    def re_switch_branch(self, branch: str, ssh: paramiko.SSHClient):
+        stdin, stdout, stderr = ssh.exec_command(f"cd {self.remote_repository_path}; git switch master; "
+                                                 f"git branch -D {branch}; "
+                                                 f"git switch -c {branch} --track origin/{branch}")
+        logging.info(f"SERVER RESPONSE:\n{''.join(stdout.readlines())}")
+        logging.info(f"Branch successfully re-switched")
 
 
 manager = RemoteManager()
@@ -92,23 +102,35 @@ manager.read_config_file()
 while True:
     try:
         command = input("--> ")
-        options = None
-        if '--' in command:
-            _c = command.split('--')
-            options = _c[-1].split(' ')
+        options = {}
+        spl_command = command.split(' ')
+        command = spl_command[0]
+        spl_options = spl_command[1:]
+        for index, option in enumerate(spl_options):
+            if len(spl_options) > 1:
+                if option.startswith("-") or option.startswith("--") \
+                        and '-' not in spl_options[index + 1] and '--' not in spl_options[index + 1]:
+                    options[option.strip('-')] = spl_options[index + 1]
+            if len(spl_options) == 1:
+                if option.startswith("-") or option.startswith("--"):
+                    options[option.strip('-')] = option.strip('-')
+                else:
+                    options['param'] = option
 
         if command.startswith("help"):
             logger.info("Available commands: \n"
                         "{r} | {replace} --> perform replacement modified files to remote repository \n"
                         "{u} | {undo}    --> undo replacement changes \n"
+                        "{s} | {switch}  --> switching branch by deleting it and track again: \n"
+                        "              example: {switch LKM-669}\n"
                         "{config}  --> config: \n"
-                        "              set full new config: {config --set}\n"
-                        "              see config options: {config}")
+                        "              set full new config: {config -s | --set}\n"
+                        "              see config options: {config}\n")
 
         elif command.startswith("config"):
             config = {}
             if options:
-                if options[0] == 'set':
+                if options.get('set'):
                     config["hostname"] = input("hostname: ")
                     config["username"] = input("username: ")
                     config["key_filepath"] = input("key_filepath: ")
@@ -128,6 +150,9 @@ while True:
 
         elif command.startswith("undo") or command == "u":
             manager.undo_replacement()
+
+        elif command.startswith("switch") or command == "s":
+            manager.re_switch_branch(branch=options["param"])
 
         elif command.startswith("exit"):
             break
