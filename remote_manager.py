@@ -6,7 +6,7 @@ from git import Repo
 
 console_out = logging.StreamHandler()
 logging.basicConfig(handlers=[console_out],
-                    format='[%(levelname)s]: %(message)s',
+                    format="[%(levelname)s]: %(message)s",
                     level=logging.INFO)
 
 logger = logging.getLogger(__name__)
@@ -52,7 +52,7 @@ class RemoteManager:
 
     def _app_restart(self, ssh: paramiko.SSHClient):
         if self.is_restart_app:
-            logger.info("Restarting server...")
+            logger.info("Restarting app...")
             ssh.exec_command(self.restart_command)
 
     def _ssh_connection(func: Callable):
@@ -69,7 +69,7 @@ class RemoteManager:
         return wrapper
 
     @_ssh_connection
-    def perform_replacement(self, ssh: paramiko.SSHClient):
+    def perform_pull(self, ssh: paramiko.SSHClient):
         local_project_repo = Repo(self.local_repository_path)
         changed_files = [item.a_path for item in local_project_repo.index.diff(None)]
         logger.info(f"Changed files ({len(changed_files)}) --> {changed_files}")
@@ -78,24 +78,25 @@ class RemoteManager:
             full_local_file_path = self.local_repository_path + local_file_path
             full_remote_file_path = self.remote_repository_path + local_file_path
             sftp.put(full_local_file_path, full_remote_file_path)
-        logging.info(f"Files replaced successfully!")
+        logging.info(f"Files pulled successfully!")
         sftp.close()
         self._app_restart(ssh)
 
     @_ssh_connection
-    def undo_replacement(self, ssh: paramiko.SSHClient):
+    def undo_pull(self, ssh: paramiko.SSHClient):
         stdin, stdout, stderr = ssh.exec_command(f"cd {self.remote_repository_path}; git stash -u && git stash drop")
         logging.info(f"SERVER RESPONSE:\n{''.join(stdout.readlines())}")
         logging.info(f"Сhanges were successfully rolled back!")
 
     @_ssh_connection
-    def re_switch_branch(self, branch: str, ssh: paramiko.SSHClient):
+    def re_switch_branch(self, branch: str, restart: bool, ssh: paramiko.SSHClient):
         stdin, stdout, stderr = ssh.exec_command(f"cd {self.remote_repository_path}; git switch master; "
                                                  f"git branch -D {branch}; "
                                                  f"git switch -c {branch} --track origin/{branch}")
         logging.info(f"SERVER RESPONSE:\n{''.join(stdout.readlines())}")
         logging.info(f"Branch successfully re-switched")
-        self._app_restart(ssh)
+        if restart:
+            self._app_restart(ssh)
 
 
 manager = RemoteManager()
@@ -109,25 +110,25 @@ while True:
         command = spl_command[0]
         spl_options = spl_command[1:]
         for index, option in enumerate(spl_options):
-            if len(spl_options) > 1:
-                if option.startswith("-") or option.startswith("--") \
-                        and '-' not in spl_options[index + 1] and '--' not in spl_options[index + 1]:
-                    options[option.strip('-')] = spl_options[index + 1]
-            if len(spl_options) == 1:
-                if option.startswith("-") or option.startswith("--"):
-                    options[option.strip('-')] = option.strip('-')
-                else:
-                    options['param'] = option
+            if option.startswith("-") or option.startswith("--"):
+                options[option.strip('-')] = option.strip('-')
+            else:
+                options['param'] = option
+
+        print(options)
 
         if command.startswith("help"):
             logger.info("Available commands: \n"
-                        "{r} | {replace} --> perform replacement modified files to remote repository \n"
-                        "{u} | {undo}    --> undo replacement changes \n"
-                        "{s} | {switch}  --> switching branch by deleting it and track again: \n"
-                        "              example: {switch LKM-669}\n"
-                        "{config}  --> config: \n"
-                        "              set full new config: {config -s | --set}\n"
-                        "              see config options: {config}\n")
+                        "{p} | {pull}     --> pull modified files to remote repository \n"
+                        "{u} | {undo}     --> undo pull changes \n"
+                        "{s} | {switch}   --> switch branch by deleting it and track again \n"
+                        "                     param: {branch_name} \n"
+                        "                     options: {-r | --restart} \n"
+                        "                 switch branch with restart: {switch LKM-669 -r} \n"
+                        "{config}         --> config: \n"
+                        "                     options: {-s | --set} \n"
+                        "                 set full new config: {config -s | --set} \n"
+                        "                 see config options: {config} \n")
 
         elif command.startswith("config"):
             config = {}
@@ -147,14 +148,17 @@ while True:
                 for attribute, value in manager.__dict__.items():
                     logger.info(f"{attribute + ' = ' + str(value)}")
 
-        elif command.startswith("replace") or command == "r":
-            manager.perform_replacement()
+        elif command.startswith("pull") or command == "p":
+            manager.perform_pull()
 
         elif command.startswith("undo") or command == "u":
-            manager.undo_replacement()
+            manager.undo_pull()
 
         elif command.startswith("switch") or command == "s":
-            manager.re_switch_branch(branch=options["param"])
+            restart = False
+            if "r" in options or "restart" in options:
+                restart = True
+            manager.re_switch_branch(branch=options["param"], restart=restart)
 
         elif command.startswith("exit"):
             break
