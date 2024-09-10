@@ -5,4 +5,3 @@ local_repository_path=/home/vladimir/aliway/
 remote_repository_path=/opt/unicorn/unicorn/
 app_restart_command=systemctl restart unicorn-app.service
 celery_restart_command=systemctl restart unicorn-celery.service
-is_restart_app=True

@@ -1,5 +1,4 @@
-a = {
-    "rr": 1
-}
+a = ['supa_r', 'supa_r_12']
 
-print(a.keys())
+if 'supa_r_' in a:
+    print(2)

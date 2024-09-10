@@ -21,7 +21,6 @@ class RemoteManager:
                  remote_repository_path: str = "",
                  app_restart_command: str = "",
                  celery_restart_command: str = "",
-                 is_restart_app: Union[bool, str] = False
                  ):
         self.hostname = hostname
         self.username = username
@@ -29,8 +28,23 @@ class RemoteManager:
         self.local_repository_path = local_repository_path
         self.remote_repository_path = remote_repository_path
         self.restart_command = f"{app_restart_command}; {celery_restart_command}"
-        self.is_restart_app = eval(is_restart_app) if isinstance(is_restart_app, str) \
-                                                   else is_restart_app
+
+    def _ssh_connection(func: Callable):
+        def wrapper(self, *args, **kwargs) -> None:
+            try:
+                ssh = paramiko.SSHClient()
+                ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+                ssh.connect(hostname=self.hostname, username=self.username, key_filename=self.key_filepath)
+                kwargs.update({"ssh": ssh})
+                func(self, *args, **kwargs)
+                ssh.close()
+            except Exception as error:
+                logger.error(str(error))
+        return wrapper
+
+    def _app_restart(self, ssh: paramiko.SSHClient):
+        ssh.exec_command(self.restart_command)
+        logger.info("Restarting app...")
 
     def set_config(self, config: dict[str, Any]):
         self.__init__(**config)
@@ -49,24 +63,6 @@ class RemoteManager:
                 name, value = setting.split("=")
                 config[name] = value.strip()
         self.__init__(**config)
-
-    def _app_restart(self, ssh: paramiko.SSHClient):
-        if self.is_restart_app:
-            logger.info("Restarting app...")
-            ssh.exec_command(self.restart_command)
-
-    def _ssh_connection(func: Callable):
-        def wrapper(self, *args, **kwargs) -> None:
-            try:
-                ssh = paramiko.SSHClient()
-                ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-                ssh.connect(hostname=self.hostname, username=self.username, key_filename=self.key_filepath)
-                kwargs.update({"ssh": ssh})
-                func(self, *args, **kwargs)
-                ssh.close()
-            except Exception as error:
-                logger.error(str(error))
-        return wrapper
 
     @_ssh_connection
     def perform_pull(self, ssh: paramiko.SSHClient):
@@ -89,8 +85,11 @@ class RemoteManager:
         logging.info(f"Сhanges were successfully rolled back!")
 
     @_ssh_connection
-    def re_switch_branch(self, branch: str, restart: bool, ssh: paramiko.SSHClient):
+    def switch_branch(self, branch: str, restart: bool, ssh: paramiko.SSHClient):
+        if branch == "master":
+            raise Exception("Do not touch master branch!")
         stdin, stdout, stderr = ssh.exec_command(f"cd {self.remote_repository_path}; git switch master; "
+                                                 f"git fetch --all; "
                                                  f"git branch -D {branch}; "
                                                  f"git switch -c {branch} --track origin/{branch}")
         logging.info(f"SERVER RESPONSE:\n{''.join(stdout.readlines())}")
@@ -115,9 +114,9 @@ while True:
             else:
                 options['param'] = option
 
-        print(options)
+        # print(options)
 
-        if command.startswith("help"):
+        if command == "help":
             logger.info("Available commands: \n"
                         "{p} | {pull}     --> pull modified files to remote repository \n"
                         "{u} | {undo}     --> undo pull changes \n"
@@ -130,7 +129,7 @@ while True:
                         "                 set full new config: {config -s | --set} \n"
                         "                 see config options: {config} \n")
 
-        elif command.startswith("config"):
+        elif command == "config":
             config = {}
             if options:
                 if options.get('set'):
@@ -148,19 +147,19 @@ while True:
                 for attribute, value in manager.__dict__.items():
                     logger.info(f"{attribute + ' = ' + str(value)}")
 
-        elif command.startswith("pull") or command == "p":
+        elif command == "pull" or command == "p":
             manager.perform_pull()
 
-        elif command.startswith("undo") or command == "u":
+        elif command == "undo" or command == "u":
             manager.undo_pull()
 
-        elif command.startswith("switch") or command == "s":
+        elif command == "switch" or command == "s":
             restart = False
             if "r" in options or "restart" in options:
                 restart = True
-            manager.re_switch_branch(branch=options["param"], restart=restart)
+            manager.switch_branch(branch=options["param"], restart=restart)
 
-        elif command.startswith("exit"):
+        elif command == "exit":
             break
 
         else:
