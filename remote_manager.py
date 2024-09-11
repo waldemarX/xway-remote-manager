@@ -1,5 +1,5 @@
 import logging
-from typing import Any, Callable, Union
+from typing import Any, Callable
 
 import paramiko
 from git import Repo
@@ -42,7 +42,12 @@ class RemoteManager:
                 logger.error(str(error))
         return wrapper
 
-    def _app_restart(self, ssh: paramiko.SSHClient):
+    @_ssh_connection
+    def restart_app(self, ssh: paramiko.SSHClient):
+        ssh.exec_command(self.restart_command)
+        logger.info("Restarting app...")
+
+    def _restart_app(self, ssh: paramiko.SSHClient):
         ssh.exec_command(self.restart_command)
         logger.info("Restarting app...")
 
@@ -76,7 +81,7 @@ class RemoteManager:
             sftp.put(full_local_file_path, full_remote_file_path)
         logging.info(f"Files pulled successfully!")
         sftp.close()
-        self._app_restart(ssh)
+        self._restart_app(ssh)
 
     @_ssh_connection
     def undo_pull(self, ssh: paramiko.SSHClient):
@@ -95,7 +100,7 @@ class RemoteManager:
         logging.info(f"SERVER RESPONSE:\n{''.join(stdout.readlines())}")
         logging.info(f"Branch successfully re-switched")
         if restart:
-            self._app_restart(ssh)
+            self._restart_app(ssh)
 
 
 manager = RemoteManager()
@@ -120,6 +125,7 @@ while True:
             logger.info("Available commands: \n"
                         "{p} | {pull}     --> pull modified files to remote repository \n"
                         "{u} | {undo}     --> undo pull changes \n"
+                        "{r} | {restart}  --> restart the app \n"
                         "{s} | {switch}   --> switch branch by deleting it and track again \n"
                         "                     param: {branch_name} \n"
                         "                     options: {-r | --restart} \n"
@@ -158,6 +164,9 @@ while True:
             if "r" in options or "restart" in options:
                 restart = True
             manager.switch_branch(branch=options["param"], restart=restart)
+
+        elif command == "restart" or command == "r":
+            manager.restart_app()
 
         elif command == "exit":
             break

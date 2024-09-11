@@ -1,4 +1,9 @@
-a = ['supa_r', 'supa_r_12']
+import requests
+import traceback
 
-if 'supa_r_' in a:
-    print(2)
+a = requests.get('http://api.pim.dev.x-way.io/cabinet/')
+
+try:
+    print(a.json())
+except requests.exceptions.JSONDecodeError as e:
+    print(traceback.format_exc())
