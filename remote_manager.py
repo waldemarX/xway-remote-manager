@@ -44,7 +44,8 @@ class RemoteManager:
 
     @_ssh_connection
     def restart_app(self, ssh: paramiko.SSHClient):
-        ssh.exec_command(self.restart_command)
+        ssh.exec_command(f"cd {self.remote_repository_path}; "
+                         f"{self.restart_command}")
         logger.info("Restarting app...")
 
     def _restart_app(self, ssh: paramiko.SSHClient):
