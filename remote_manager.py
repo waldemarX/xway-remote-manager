@@ -29,7 +29,7 @@ class RemoteManager:
         self.remote_repository_path = remote_repository_path
         self.restart_command = f"{app_restart_command}; {celery_restart_command}"
 
-    def _ssh_connection(func: Callable):
+    def _ssh_session(func: Callable):
         def wrapper(self, *args, **kwargs) -> None:
             try:
                 ssh = paramiko.SSHClient()
@@ -41,12 +41,6 @@ class RemoteManager:
             except Exception as error:
                 logger.error(str(error))
         return wrapper
-
-    @_ssh_connection
-    def restart_app(self, ssh: paramiko.SSHClient):
-        ssh.exec_command(f"cd {self.remote_repository_path}; "
-                         f"{self.restart_command}")
-        logger.info("Restarting app...")
 
     def _restart_app(self, ssh: paramiko.SSHClient):
         ssh.exec_command(self.restart_command)
@@ -70,7 +64,13 @@ class RemoteManager:
                 config[name] = value.strip()
         self.__init__(**config)
 
-    @_ssh_connection
+    @_ssh_session
+    def restart_app(self, ssh: paramiko.SSHClient):
+        ssh.exec_command(f"cd {self.remote_repository_path}; "
+                         f"{self.restart_command}")
+        logger.info("Restarting app...")
+
+    @_ssh_session
     def perform_pull(self, ssh: paramiko.SSHClient):
         local_project_repo = Repo(self.local_repository_path)
         changed_files = [item.a_path for item in local_project_repo.index.diff(None)]
@@ -84,13 +84,13 @@ class RemoteManager:
         sftp.close()
         self._restart_app(ssh)
 
-    @_ssh_connection
+    @_ssh_session
     def undo_pull(self, ssh: paramiko.SSHClient):
         stdin, stdout, stderr = ssh.exec_command(f"cd {self.remote_repository_path}; git stash -u && git stash drop")
         logging.info(f"SERVER RESPONSE:\n{''.join(stdout.readlines())}")
         logging.info(f"Сhanges were successfully rolled back!")
 
-    @_ssh_connection
+    @_ssh_session
     def switch_branch(self, branch: str, restart: bool, ssh: paramiko.SSHClient):
         if branch == "master":
             raise Exception("Do not touch master branch!")
