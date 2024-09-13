@@ -95,7 +95,6 @@ class RemoteManager:
         if branch == "master":
             raise Exception("Do not touch master branch!")
         stdin, stdout, stderr = ssh.exec_command(f"cd {self.remote_repository_path}; git switch master; "
-                                                 f"git fetch --all; "
                                                  f"git branch -D {branch}; "
                                                  f"git switch -c {branch} --track origin/{branch}")
         logging.info(f"SERVER RESPONSE:\n{''.join(stdout.readlines())}")
