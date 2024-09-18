@@ -4,7 +4,6 @@ from typing import Any, Callable
 
 import paramiko
 from git import Repo
-from requests import options
 
 
 class RemoteManager:
@@ -151,7 +150,6 @@ class CommandHandler:
                 options[option.strip('-')] = option.strip('-')
             else:
                 options['param'] = option
-
         return command, options
 
     def start(self):
