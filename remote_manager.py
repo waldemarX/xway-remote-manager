@@ -130,7 +130,6 @@ class CommandHandler:
         for item in command_funcs:
             self.call_command_map[item[0].replace("execute_", "")] = item[1]
 
-
     def _handle_command_input(self) -> tuple[str, dict[str, Any]]:
         if self.do_last_command:
             self.do_last_command = False
