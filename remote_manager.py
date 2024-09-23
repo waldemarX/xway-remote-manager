@@ -71,13 +71,12 @@ class RemoteManager:
         changed_files = [item.a_path for item in local_project_repo.index.diff(None)]
         logger.info(f"Changed files ({len(changed_files)}) --> {changed_files}")
         self.drop_changes()
-        sftp = ssh.open_sftp()
-        for local_file_path in changed_files:
-            full_local_file_path = self.local_repository_path + local_file_path
-            full_remote_file_path = self.remote_repository_path + local_file_path
-            sftp.put(full_local_file_path, full_remote_file_path)
-        logger.info(f"Files pulled successfully!")
-        sftp.close()
+        with ssh.open_sftp() as sftp:
+            for local_file_path in changed_files:
+                full_local_file_path = self.local_repository_path + local_file_path
+                full_remote_file_path = self.remote_repository_path + local_file_path
+                sftp.put(full_local_file_path, full_remote_file_path)
+            logger.info(f"Files pulled successfully!")
         self._restart_app(ssh)
 
     @_ssh_session
