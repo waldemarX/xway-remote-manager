@@ -27,12 +27,11 @@ class RemoteManager:
     def _ssh_session(func: Callable):
         def wrapper(self, *args, **kwargs) -> None:
             try:
-                ssh = paramiko.SSHClient()
-                ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-                ssh.connect(hostname=self.hostname, username=self.username, key_filename=self.key_filepath)
-                kwargs.update({"ssh": ssh})
-                func(self, *args, **kwargs)
-                ssh.close()
+                with paramiko.SSHClient() as ssh:
+                    ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+                    ssh.connect(hostname=self.hostname, username=self.username, key_filename=self.key_filepath)
+                    kwargs.update({"ssh": ssh})
+                    func(self, *args, **kwargs)
             except Exception as error:
                 logger.error(str(error))
         return wrapper
@@ -66,7 +65,7 @@ class RemoteManager:
         logger.info("Restarting app...")
 
     @_ssh_session
-    def perform_push(self, ssh: paramiko.SSHClient):
+    def perform_push(self, restart: bool, ssh: paramiko.SSHClient):
         local_project_repo = Repo(self.local_repository_path)
         changed_files = [item.a_path for item in local_project_repo.index.diff(None)]
         logger.info(f"Changed files ({len(changed_files)}) --> {changed_files}")
@@ -77,7 +76,8 @@ class RemoteManager:
                 full_remote_file_path = self.remote_repository_path + local_file_path
                 sftp.put(full_local_file_path, full_remote_file_path)
             logger.info(f"Files pulled successfully!")
-        self._restart_app(ssh)
+        if restart:
+            self._restart_app(ssh)
 
     @_ssh_session
     def drop_changes(self, ssh: paramiko.SSHClient):
@@ -167,6 +167,7 @@ class CommandHandler:
     def execute_command_help(self, options: dict[str, Any]):
         logger.info("Available commands: \n"
                     "{p} | {push}      -->  push modified files to remote repository \n"
+                    "                       options: {-nr | --no-restart} \n"
                     "{d} | {drop}      -->  drop changes \n"
                     "{r} | {restart}   -->  restart the app \n"
                     "{s} | {switch}    -->  switch branch by deleting it and track again \n"
@@ -210,7 +211,10 @@ class CommandHandler:
         self.command_history.pop(-1)
 
     def execute_command_push(self, options: dict[str, Any]):
-        self.manager.perform_push()
+        restart = True
+        if options.get("nr") or options.get("no-restart"):
+            restart = False
+        self.manager.perform_push(restart)
 
     def execute_command_drop(self, options: dict[str, Any]):
         self.manager.drop_changes()
