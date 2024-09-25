@@ -100,15 +100,15 @@ class RemoteManager:
 
 class CommandHandler:
 
-    COMMAND_HELP = ("help",)
-    COMMAND_EXIT = ("exit",)
-    COMMAND_CONFIG = ("cfg", "config")
+    COMMAND_HELP    = ("help",)
+    COMMAND_EXIT    = ("exit",)
+    COMMAND_CONFIG  = ("cfg", "config")
     COMMAND_HISTORY = ("h", "history")
-    COMMAND_LAST = ("l", "last")
-    COMMAND_PUSH = ("p", "push")
-    COMMAND_DROP = ("d", "drop")
+    COMMAND_LAST    = ("l", "last")
+    COMMAND_PUSH    = ("p", "push")
+    COMMAND_DROP    = ("d", "drop")
     COMMAND_RESTART = ("r", "restart")
-    COMMAND_SWITCH = ("s", "switch")
+    COMMAND_SWITCH  = ("s", "switch")
 
     def __init__(self):
         self.manager = RemoteManager()
