@@ -203,6 +203,7 @@ class CommandHandler:
                 logger.info(f"{attribute + ' = ' + str(value)}")
 
     def execute_command_history(self, options: dict[str, Any]):
+        self.command_history.pop(-1)
         for command in self.command_history:
             logger.info(f"{command}")
 
