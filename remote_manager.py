@@ -81,7 +81,8 @@ class RemoteManager:
 
     @_ssh_session
     def drop_changes(self, ssh: paramiko.SSHClient):
-        stdin, stdout, stderr = ssh.exec_command(f"cd {self.remote_repository_path}; git stash -u && git stash drop")
+        stdin, stdout, stderr = ssh.exec_command(f"cd {self.remote_repository_path};"
+                                                 f"git stash -u && git stash drop")
         logger.info(f"SERVER RESPONSE:\n{''.join(stdout.readlines())}")
         logger.info(f"Сhanges were successfully rolled back!")
 
@@ -89,7 +90,8 @@ class RemoteManager:
     def switch_branch(self, branch: str, restart: bool, ssh: paramiko.SSHClient):
         if branch == "master":
             raise Exception("Do not touch master branch!")
-        stdin, stdout, stderr = ssh.exec_command(f"cd {self.remote_repository_path}; git switch master; "
+        stdin, stdout, stderr = ssh.exec_command(f"cd {self.remote_repository_path};"
+                                                 f"git switch master; "
                                                  f"git branch -D {branch}; "
                                                  f"git switch -c {branch} --track origin/{branch}")
         logger.info(f"SERVER RESPONSE:\n{''.join(stdout.readlines())}")
