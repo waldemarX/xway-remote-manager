@@ -99,6 +99,11 @@ class RemoteManager:
         if restart:
             self._restart_app(ssh)
 
+    @_ssh_session
+    def get_file(self, ssh: paramiko.SSHClient):
+        with ssh.open_sftp() as sftp:
+            sftp.get("/opt/unicorn/unicorn/stock_feed.xml", "/home/vladimir/Desktop/stock_feed.xml")
+
 
 class CommandHandler:
 
@@ -111,6 +116,7 @@ class CommandHandler:
     COMMAND_DROP    = ("d", "drop")
     COMMAND_RESTART = ("r", "restart")
     COMMAND_SWITCH  = ("s", "switch")
+    COMMAND_GET     = ("g", "get")
 
     def __init__(self):
         self.manager = RemoteManager()
@@ -191,7 +197,7 @@ class CommandHandler:
     def execute_command_config(self, options: dict[str, Any]):
         config = {}
         if options:
-            if options.get('set'):
+            if options.get('set') or options.get('s'):
                 config["hostname"] = input("hostname: ")
                 config["username"] = input("username: ")
                 config["key_filepath"] = input("key_filepath: ")
@@ -231,6 +237,8 @@ class CommandHandler:
             restart = True
         self.manager.switch_branch(branch=options["param"], restart=restart)
 
+    def execute_command_get(self, options: dict[str, Any]):
+        self.manager.get_file()
 
 if __name__ == '__main__':
     console_out = logging.StreamHandler()

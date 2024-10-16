@@ -1,3 +1,3 @@
-a = 5
+a = False
 
-print(a not in [3, 4])
+print(a or None)
