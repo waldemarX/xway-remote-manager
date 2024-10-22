@@ -1,3 +1,6 @@
-a = False
+a = 1
+b = set()
 
-print(a or None)
+b.add(a)
+
+print(len(b))

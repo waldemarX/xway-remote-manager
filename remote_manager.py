@@ -235,7 +235,10 @@ class CommandHandler:
         restart = False
         if "r" in options or "restart" in options:
             restart = True
-        self.manager.switch_branch(branch=options["param"], restart=restart)
+        if options.get("param"):
+            self.manager.switch_branch(branch=options["param"], restart=restart)
+        else:
+            logger.error(f"Branch not specified")
 
     def execute_command_get(self, options: dict[str, Any]):
         self.manager.get_file()
