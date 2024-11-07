@@ -243,12 +243,11 @@ class CommandHandler:
     def execute_command_get(self, options: dict[str, Any]):
         self.manager.get_file()
 
+
 if __name__ == '__main__':
-    console_out = logging.StreamHandler()
-    logging.basicConfig(handlers=[console_out],
+    logging.basicConfig(handlers=[logging.StreamHandler()],
                         format="[%(levelname)s]: %(message)s",
                         level=logging.INFO)
     logger = logging.getLogger(__name__)
 
-    command_handler = CommandHandler()
-    command_handler.start()
+    CommandHandler().start()
