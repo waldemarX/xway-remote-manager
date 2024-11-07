@@ -1,6 +1,4 @@
-a = 1
-b = set()
+a = {}
 
-b.add(a)
-
-print(len(b))
+if a.values():
+    print(1)

@@ -111,7 +111,6 @@ class CommandHandler:
     COMMAND_DROP    = ("d", "drop")
     COMMAND_RESTART = ("r", "restart")
     COMMAND_SWITCH  = ("s", "switch")
-    COMMAND_GET     = ("g", "get")
 
     def __init__(self):
         self.manager = RemoteManager()
@@ -234,10 +233,6 @@ class CommandHandler:
             self.manager.switch_branch(branch=options["param"], restart=restart)
         else:
             logger.error(f"Branch not specified")
-
-    def execute_command_get(self, options: dict[str, Any]):
-        self.manager.get_file()
-
 
 if __name__ == '__main__':
     logging.basicConfig(handlers=[logging.StreamHandler()],
