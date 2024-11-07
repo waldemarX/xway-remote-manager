@@ -99,11 +99,6 @@ class RemoteManager:
         if restart:
             self._restart_app(ssh)
 
-    @_ssh_session
-    def get_file(self, ssh: paramiko.SSHClient):
-        with ssh.open_sftp() as sftp:
-            sftp.get("/opt/unicorn/unicorn/stock_feed.xml", "/home/vladimir/Desktop/stock_feed.xml")
-
 
 class CommandHandler:
 
