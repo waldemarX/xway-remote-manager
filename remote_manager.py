@@ -5,6 +5,9 @@ from typing import Any, Callable
 import paramiko
 from git import Repo
 
+CONFIG_FILE = "config"
+MASTER_BRANCH = "master"
+
 
 class RemoteManager:
 
@@ -23,6 +26,7 @@ class RemoteManager:
         self.local_repository_path = local_repository_path
         self.remote_repository_path = remote_repository_path
         self.restart_command = f"{app_restart_command}; {celery_restart_command}"
+        # self.restart_command = f"{app_restart_command}"
 
     def _ssh_session(func: Callable):
         def wrapper(self, *args, **kwargs) -> None:
@@ -42,7 +46,7 @@ class RemoteManager:
 
     def set_config(self, config: dict[str, Any]):
         self.__init__(**config)
-        with open("config", "a+") as file:
+        with open(CONFIG_FILE, "a+") as file:
             file.seek(0)
             file.truncate()
             for setting, value in config.items():
@@ -50,7 +54,7 @@ class RemoteManager:
 
     def read_config_file(self):
         config = {}
-        with open("config", "a+") as file:
+        with open(CONFIG_FILE, "a+") as file:
             file.seek(0)
             settings = file.readlines()
             for setting in settings:
@@ -88,7 +92,7 @@ class RemoteManager:
 
     @_ssh_session
     def switch_branch(self, branch: str, restart: bool, ssh: paramiko.SSHClient):
-        if branch == "master":
+        if branch == MASTER_BRANCH:
             raise Exception("Do not touch master branch!")
         stdin, stdout, stderr = ssh.exec_command(f"cd {self.remote_repository_path};"
                                                  f"git switch master; "
